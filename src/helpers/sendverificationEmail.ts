@@ -5,14 +5,14 @@ import { resend } from "@/lib/resend";
 export async function sendVerificationEmail(
   email: string,
   username: string,
-  varificationcode: string
+  verifycode: string
 ): Promise<ApiResponse> {
   try {
     await resend.emails.send({
       from: "you@example.com",
       to: email,
       subject: "pulsewave | Verification Code",
-      react: VerificationEmail({ username, otp: varificationcode }),
+      react: VerificationEmail({ username, otp: verifycode }),
     });
 
     return {
