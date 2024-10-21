@@ -1,107 +1,90 @@
 import dbConnect from "@/lib/dbConnect";
-import UserModel from "@/model/User";
-import { usernameValidation } from "@/schemas/signUpSchema";
+import UserModel, { User } from "@/model/User";
 import { verifySchema } from "@/schemas/verifySchema";
-import { z } from "zod";
+import { NextResponse } from "next/server";
 
-const UsernameQuerySchema = z.object({
-  username: usernameValidation,
-});
-
-const VerifyEmailQuerySchema = z.object({
-  token: verifySchema,
-});
-
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   await dbConnect();
+
   try {
-    const { username, token } = await request.json();
+    // Define the expected structure of request data
+    const { username, token }: { username: string; token: string } =
+      await request.json();
 
-    const usernameParamsResult = UsernameQuerySchema.safeParse({ username });
-    if (!usernameParamsResult.success) {
-      const usernameErrors =
-        usernameParamsResult.error.format().username?._errors || [];
-
-      return Response.json(
-        {
-          success: false,
-          message:
-            usernameErrors?.length > 0
-              ? usernameErrors?.join(", ")
-              : "invalid query paramaitars",
-        },
-        { status: 400 }
-      );
-    }
-
-    const emailParamsResult = VerifyEmailQuerySchema.safeParse({ token });
+    // Validate the input (both token and username)
+    const emailParamsResult = verifySchema.safeParse(token); // Directly validate the token as a string
     if (!emailParamsResult.success) {
-      const emailErrors = emailParamsResult.error.format().token?._errors || [];
+      const emailErrors = emailParamsResult.error.format()?._errors || [];
 
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
           message:
             emailErrors?.length > 0
-              ? emailErrors?.join(", ")
-              : "invalid query paramaitars",
+              ? emailErrors.join(", ")
+              : "Invalid verification code",
         },
         { status: 400 }
       );
     }
 
-    const existingVerifyUser = await UserModel.findOne({ username });
+    // Find the user by username
+    const existingVerifyUser = (await UserModel.findOne({
+      username,
+    })) as User | null;
 
     if (!existingVerifyUser) {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
-          message: "user not found",
+          message: "User not found",
         },
         { status: 400 }
       );
     }
 
+    // Verify if the token matches the user's verification code
     const isCodeValid = existingVerifyUser.verifycode === token;
     if (!isCodeValid) {
-      return Response.json(
+      return NextResponse.json(
         {
           success: false,
-          message: "invalid verification code",
+          message: "Invalid verification code",
         },
         { status: 400 }
       );
     }
-    // check if code expired
+
+    // Check if the verification code has expired
     const isCodeExpired =
-      new Date(existingVerifyUser.verifycodeExpires) > new Date();
-    // check if code expired
-    if (!isCodeExpired) {
-      return Response.json(
+      new Date(existingVerifyUser.verifycodeExpires) < new Date();
+    if (isCodeExpired) {
+      return NextResponse.json(
         {
           success: false,
-          message: "verification code expired",
+          message: "Verification code expired",
         },
         { status: 400 }
       );
     }
-    // update user verified to true
+
+    // Update the user's verification status
     existingVerifyUser.isVerified = true;
     await existingVerifyUser.save();
 
-    return Response.json(
+    return NextResponse.json(
       {
         success: true,
-        message: "user verified successfully",
+        message: "User verified successfully",
       },
       { status: 200 }
     );
   } catch (error) {
-    console.log(error);
-    return Response.json(
+    console.error("Verification Error:", error);
+    return NextResponse.json(
       {
         success: false,
-        message: "error user verification",
+        message: "Error during user verification",
       },
       { status: 500 }
     );
