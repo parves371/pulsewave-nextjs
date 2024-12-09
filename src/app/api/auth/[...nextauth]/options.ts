@@ -13,20 +13,20 @@ export const authOption: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials: any): Promise<any> {
+      async authorize(credentials: { email: string; password: string }): Promise<any> {
         await dbConnect();
         try {
           const user = await User.findOne({
             $or: [
-              { email: credentials.identifier },
-              { username: credentials.identifier },
+              { email: credentials.email },
+              { username: credentials.email }, // Assuming username is also valid for login
             ],
           });
 
           if (!user) {
             throw new Error("Invalid credentials");
           }
-          if (user.isVerified === false) {
+          if (!user.isVerified) {
             throw new Error("Account is not verified");
           }
 
@@ -35,13 +35,14 @@ export const authOption: NextAuthOptions = {
             user.password
           );
 
-          if (isPasswordCorrect) {
-            return user;
-          } else {
-            throw new Error("incorect password");
+          if (!isPasswordCorrect) {
+            throw new Error("Incorrect password");
           }
+
+          return user;
         } catch (error) {
-          throw new Error(error as string);
+          console.error("Error during authentication:", error);
+          throw new Error(error instanceof Error ? error.message : "An error occurred");
         }
       },
     }),

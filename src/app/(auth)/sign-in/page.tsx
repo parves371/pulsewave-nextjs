@@ -18,15 +18,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { signInSchema } from "@/schemas/signInchema";
+import { signInSchema } from "@/schemas/signInchema"; // Ensure this schema validates email and password
 import { signIn } from "next-auth/react";
+
 const SignInPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const { toast } = useToast();
   const router = useRouter();
 
-  // zod impletation
+  // Zod implementation
   const form = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -39,14 +39,18 @@ const SignInPage = () => {
     setIsSubmitting(true);
     const result = await signIn("credentials", {
       redirect: false,
-      identifier: data.email,
+      email: data.email, // Changed to 'email' instead of 'identifier'
       password: data.password,
     });
+    
+    setIsSubmitting(false); // Ensure this is called regardless of the result
+
     if (result?.error) {
-      setIsSubmitting(false);
       return toast({
-        title: "login failed",
-        description: "incorrect email or password",
+        title: "Login failed",
+        description: result.error === "Account is not verified" 
+          ? "Please verify your account before logging in." 
+          : "Incorrect email or password.",
         variant: "destructive",
       });
     }
@@ -74,7 +78,11 @@ const SignInPage = () => {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="email" {...field} />
+                    <Input 
+                      placeholder="email" 
+                      {...field} 
+                      aria-describedby="email-description" // Accessibility improvement
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -85,15 +93,19 @@ const SignInPage = () => {
               control={form.control}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>password</FormLabel>
+                  <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input placeholder="password" {...field} />
+                    <Input 
+                      type="password" 
+                      placeholder="password" 
+                      {...field} 
+                      aria-describedby="password-description" // Accessibility improvement
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
